@@ -1,456 +1,167 @@
-#pragma warning(disable : 4996)
-#include <stdio.h>
-#include <stdlib.h>
-#include <Windows.h>
+#pragma warning(disable : 4996) // 보안 경고(C4996)를 비활성화
+#include <stdio.h>				// 표준 입출력 함수 사용
+#include <stdlib.h>				// 동적 메모리 할당 및 rand() 함수 사용
+#include <Windows.h>			// Windows API 사용 (BITMAP 관련 구조체 포함)
+
+// 이미지 반전 함수
 void InverseImage(BYTE *Img, BYTE *Out, int W, int H)
 {
-	int ImgSize = W * H;
-	for (int i = 0; i < ImgSize; i++)
+	int ImgSize = W * H;			  // 이미지 크기 계산 (너비 * 높이)
+	for (int i = 0; i < ImgSize; i++) // 모든 픽셀에 대해 반복
 	{
-		Out[i] = 255 - Img[i];
+		Out[i] = 255 - Img[i]; // 픽셀 값을 반전 (255에서 뺌)
 	}
 }
+
+// 밝기 조정 함수
 void BrightnessAdj(BYTE *Img, BYTE *Out, int W, int H, int Val)
 {
-	int ImgSize = W * H;
-	for (int i = 0; i < ImgSize; i++)
+	int ImgSize = W * H;			  // 이미지 크기 계산
+	for (int i = 0; i < ImgSize; i++) // 모든 픽셀에 대해 반복
 	{
-		if (Img[i] + Val > 255)
+		if (Img[i] + Val > 255) // 밝기 조정 후 값이 255를 초과하면
 		{
-			Out[i] = 255;
+			Out[i] = 255; // 최대값으로 설정
 		}
-		else if (Img[i] + Val < 0)
+		else if (Img[i] + Val < 0) // 밝기 조정 후 값이 0보다 작으면
 		{
-			Out[i] = 0;
+			Out[i] = 0; // 최소값으로 설정
 		}
 		else
-			Out[i] = Img[i] + Val;
+			Out[i] = Img[i] + Val; // 밝기 조정 값 적용
 	}
 }
+
+// 대비 조정 함수
 void ContrastAdj(BYTE *Img, BYTE *Out, int W, int H, double Val)
 {
-	int ImgSize = W * H;
-	for (int i = 0; i < ImgSize; i++)
+	int ImgSize = W * H;			  // 이미지 크기 계산
+	for (int i = 0; i < ImgSize; i++) // 모든 픽셀에 대해 반복
 	{
-		if (Img[i] * Val > 255.0)
+		if (Img[i] * Val > 255.0) // 대비 조정 후 값이 255를 초과하면
 		{
-			Out[i] = 255;
+			Out[i] = 255; // 최대값으로 설정
 		}
 		else
-			Out[i] = (BYTE)(Img[i] * Val);
+			Out[i] = (BYTE)(Img[i] * Val); // 대비 조정 값 적용
 	}
 }
 
+// 히스토그램 계산 함수
 void ObtainHistogram(BYTE *Img, int *Histo, int W, int H)
 {
-	int ImgSize = W * H;
-	for (int i = 0; i < ImgSize; i++)
+	int ImgSize = W * H;			  // 이미지 크기 계산
+	for (int i = 0; i < ImgSize; i++) // 모든 픽셀에 대해 반복
 	{
-		Histo[Img[i]]++;
+		Histo[Img[i]]++; // 해당 픽셀 값에 해당하는 히스토그램 값 증가
 	}
 }
 
+// 누적 히스토그램 계산 함수
 void ObtainAHistogram(int *Histo, int *AHisto)
 {
-	for (int i = 0; i < 256; i++)
+	for (int i = 0; i < 256; i++) // 모든 픽셀 값(0~255)에 대해 반복
 	{
-		for (int j = 0; j <= i; j++)
+		for (int j = 0; j <= i; j++) // 누적 합 계산
 		{
 			AHisto[i] += Histo[j];
 		}
 	}
 }
 
-void HistogramStretching(BYTE *Img, BYTE *Out, int *Histo, int W, int H)
-{
-	int ImgSize = W * H;
-	BYTE Low, High;
-	for (int i = 0; i < 256; i++)
-	{
-		if (Histo[i] != 0)
-		{
-			Low = i;
-			break;
-		}
-	}
-	for (int i = 255; i >= 0; i--)
-	{
-		if (Histo[i] != 0)
-		{
-			High = i;
-			break;
-		}
-	}
-	for (int i = 0; i < ImgSize; i++)
-	{
-		Out[i] = (BYTE)((Img[i] - Low) / (double)(High - Low) * 255.0);
-	}
-}
+// 히스토그램 평활화 함수
 void HistogramEqualization(BYTE *Img, BYTE *Out, int *AHisto, int W, int H)
 {
-	int ImgSize = W * H;
-	int Nt = W * H, Gmax = 255;
-	double Ratio = Gmax / (double)Nt;
-	BYTE NormSum[256];
-	for (int i = 0; i < 256; i++)
+	int ImgSize = W * H;			  // 이미지 크기 계산
+	int Nt = W * H, Gmax = 255;		  // 총 픽셀 수(Nt)와 최대 그레이스케일 값(Gmax)
+	double Ratio = Gmax / (double)Nt; // 정규화 비율 계산
+	BYTE NormSum[256];				  // 정규화된 누적 합 배열
+	for (int i = 0; i < 256; i++)	  // 정규화된 누적 합 계산
 	{
 		NormSum[i] = (BYTE)(Ratio * AHisto[i]);
 	}
-	for (int i = 0; i < ImgSize; i++)
+	for (int i = 0; i < ImgSize; i++) // 모든 픽셀에 대해 반복
 	{
-		Out[i] = NormSum[Img[i]];
+		Out[i] = NormSum[Img[i]]; // 정규화된 값 적용
 	}
 }
 
-void Binarization(BYTE *Img, BYTE *Out, int W, int H, BYTE Threshold)
-{
-	int ImgSize = W * H;
-	for (int i = 0; i < ImgSize; i++)
-	{
-		if (Img[i] < Threshold)
-			Out[i] = 0;
-		else
-			Out[i] = 255;
-	}
-}
-
-// int GozalezBinThresh()
-//{
-//
-// }
-
-void AverageConv(BYTE *Img, BYTE *Out, int W, int H) // 박스평활화
-{
-	double Kernel[3][3] = {0.11111, 0.11111, 0.11111,
-						   0.11111, 0.11111, 0.11111,
-						   0.11111, 0.11111, 0.11111};
-	double SumProduct = 0.0;
-	for (int i = 1; i < H - 1; i++)
-	{ // Y좌표 (행)
-		for (int j = 1; j < W - 1; j++)
-		{ // X좌표 (열)
-			for (int m = -1; m <= 1; m++)
-			{ // Kernel 행
-				for (int n = -1; n <= 1; n++)
-				{ // Kernel 열
-					SumProduct += Img[(i + m) * W + (j + n)] * Kernel[m + 1][n + 1];
-				}
-			}
-			Out[i * W + j] = (BYTE)SumProduct;
-			SumProduct = 0.0;
-		}
-	}
-}
-
-void GaussAvrConv(BYTE *Img, BYTE *Out, int W, int H) // 가우시안평활화
-{
-	double Kernel[3][3] = {0.0625, 0.125, 0.0625,
-						   0.125, 0.25, 0.125,
-						   0.0625, 0.125, 0.0625};
-	double SumProduct = 0.0;
-	for (int i = 1; i < H - 1; i++)
-	{ // Y좌표 (행)
-		for (int j = 1; j < W - 1; j++)
-		{ // X좌표 (열)
-			for (int m = -1; m <= 1; m++)
-			{ // Kernel 행
-				for (int n = -1; n <= 1; n++)
-				{ // Kernel 열
-					SumProduct += Img[(i + m) * W + (j + n)] * Kernel[m + 1][n + 1];
-				}
-			}
-			Out[i * W + j] = (BYTE)SumProduct;
-			SumProduct = 0.0;
-		}
-	}
-}
-
-void Prewitt_X_Conv(BYTE *Img, BYTE *Out, int W, int H) // Prewitt 마스크 X
-{
-	double Kernel[3][3] = {-1.0, 0.0, 1.0,
-						   -1.0, 0.0, 1.0,
-						   -1.0, 0.0, 1.0};
-	double SumProduct = 0.0;
-	for (int i = 1; i < H - 1; i++)
-	{ // Y좌표 (행)
-		for (int j = 1; j < W - 1; j++)
-		{ // X좌표 (열)
-			for (int m = -1; m <= 1; m++)
-			{ // Kernel 행
-				for (int n = -1; n <= 1; n++)
-				{ // Kernel 열
-					SumProduct += Img[(i + m) * W + (j + n)] * Kernel[m + 1][n + 1];
-				}
-			}
-			// 0 ~ 765  =====> 0 ~ 255
-			Out[i * W + j] = abs((long)SumProduct) / 3;
-			SumProduct = 0.0;
-		}
-	}
-}
-
-void Prewitt_Y_Conv(BYTE *Img, BYTE *Out, int W, int H) // Prewitt 마스크 X
-{
-	double Kernel[3][3] = {-1.0, -1.0, -1.0,
-						   0.0, 0.0, 0.0,
-						   1.0, 1.0, 1.0};
-	double SumProduct = 0.0;
-	for (int i = 1; i < H - 1; i++)
-	{ // Y좌표 (행)
-		for (int j = 1; j < W - 1; j++)
-		{ // X좌표 (열)
-			for (int m = -1; m <= 1; m++)
-			{ // Kernel 행
-				for (int n = -1; n <= 1; n++)
-				{ // Kernel 열
-					SumProduct += Img[(i + m) * W + (j + n)] * Kernel[m + 1][n + 1];
-				}
-			}
-			// 0 ~ 765  =====> 0 ~ 255
-			Out[i * W + j] = abs((long)SumProduct) / 3;
-			SumProduct = 0.0;
-		}
-	}
-}
-
-void Sobel_X_Conv(BYTE *Img, BYTE *Out, int W, int H) // Prewitt 마스크 X
-{
-	double Kernel[3][3] = {-1.0, 0.0, 1.0,
-						   -2.0, 0.0, 2.0,
-						   -1.0, 0.0, 1.0};
-	double SumProduct = 0.0;
-	for (int i = 1; i < H - 1; i++)
-	{ // Y좌표 (행)
-		for (int j = 1; j < W - 1; j++)
-		{ // X좌표 (열)
-			for (int m = -1; m <= 1; m++)
-			{ // Kernel 행
-				for (int n = -1; n <= 1; n++)
-				{ // Kernel 열
-					SumProduct += Img[(i + m) * W + (j + n)] * Kernel[m + 1][n + 1];
-				}
-			}
-			// 0 ~ 1020  =====> 0 ~ 255
-			Out[i * W + j] = abs((long)SumProduct) / 4;
-			SumProduct = 0.0;
-		}
-	}
-}
-
-void Sobel_Y_Conv(BYTE *Img, BYTE *Out, int W, int H) // Prewitt 마스크 X
-{
-	double Kernel[3][3] = {-1.0, -2.0, -1.0,
-						   0.0, 0.0, 0.0,
-						   1.0, 2.0, 1.0};
-	double SumProduct = 0.0;
-	for (int i = 1; i < H - 1; i++)
-	{ // Y좌표 (행)
-		for (int j = 1; j < W - 1; j++)
-		{ // X좌표 (열)
-			for (int m = -1; m <= 1; m++)
-			{ // Kernel 행
-				for (int n = -1; n <= 1; n++)
-				{ // Kernel 열
-					SumProduct += Img[(i + m) * W + (j + n)] * Kernel[m + 1][n + 1];
-				}
-			}
-			// 0 ~ 765  =====> 0 ~ 255
-			Out[i * W + j] = abs((long)SumProduct) / 4;
-			SumProduct = 0.0;
-		}
-	}
-}
-
-void Laplace_Conv(BYTE *Img, BYTE *Out, int W, int H) // Prewitt 마스크 X
-{
-	double Kernel[3][3] = {-1.0, -1.0, -1.0,
-						   -1.0, 8.0, -1.0,
-						   -1.0, -1.0, -1.0};
-	double SumProduct = 0.0;
-	for (int i = 1; i < H - 1; i++)
-	{ // Y좌표 (행)
-		for (int j = 1; j < W - 1; j++)
-		{ // X좌표 (열)
-			for (int m = -1; m <= 1; m++)
-			{ // Kernel 행
-				for (int n = -1; n <= 1; n++)
-				{ // Kernel 열
-					SumProduct += Img[(i + m) * W + (j + n)] * Kernel[m + 1][n + 1];
-				}
-			}
-			// 0 ~ 2040  =====> 0 ~ 255
-			Out[i * W + j] = abs((long)SumProduct) / 8;
-			SumProduct = 0.0;
-		}
-	}
-}
-
-void Laplace_Conv_DC(BYTE *Img, BYTE *Out, int W, int H) // Prewitt 마스크 X
-{
-	double Kernel[3][3] = {-1.0, -1.0, -1.0,
-						   -1.0, 9.0, -1.0,
-						   -1.0, -1.0, -1.0};
-	double SumProduct = 0.0;
-	for (int i = 1; i < H - 1; i++)
-	{ // Y좌표 (행)
-		for (int j = 1; j < W - 1; j++)
-		{ // X좌표 (열)
-			for (int m = -1; m <= 1; m++)
-			{ // Kernel 행
-				for (int n = -1; n <= 1; n++)
-				{ // Kernel 열
-					SumProduct += Img[(i + m) * W + (j + n)] * Kernel[m + 1][n + 1];
-				}
-			}
-			// Out[i * W + j] = abs((long)SumProduct) / 8;
-			if (SumProduct > 255.0)
-				Out[i * W + j] = 255;
-			else if (SumProduct < 0.0)
-				Out[i * W + j] = 0;
-			else
-				Out[i * W + j] = (BYTE)SumProduct;
-			SumProduct = 0.0;
-		}
-	}
-}
-
-void SaveBMPFile(BITMAPFILEHEADER hf, BITMAPINFOHEADER hInfo,
-				 RGBQUAD *hRGB, BYTE *Output, int W, int H, const char *FileName)
-{
-	FILE *fp = fopen(FileName, "wb");
-	fwrite(&hf, sizeof(BYTE), sizeof(BITMAPFILEHEADER), fp);
-	fwrite(&hInfo, sizeof(BYTE), sizeof(BITMAPINFOHEADER), fp);
-	fwrite(hRGB, sizeof(RGBQUAD), 256, fp);
-	fwrite(Output, sizeof(BYTE), W * H, fp);
-	fclose(fp);
-}
-
+// 미디언 필터링에서 사용하는 배열 정렬 함수
 void swap(BYTE *a, BYTE *b)
 {
-	BYTE temp = *a;
+	BYTE temp = *a; // 두 값을 교환
 	*a = *b;
 	*b = temp;
 }
 
+// 미디언 필터링에서 중앙값 계산 함수
 BYTE Median(BYTE *arr, int size)
 {
-	// 오름차순 정렬
-	const int S = size;
-	for (int i = 0; i < size - 1; i++) // pivot index
+	// 배열을 오름차순으로 정렬
+	for (int i = 0; i < size - 1; i++) // 기준 인덱스
 	{
-		for (int j = i + 1; j < size; j++) // 비교대상 index
+		for (int j = i + 1; j < size; j++) // 비교 대상 인덱스
 		{
-			if (arr[i] > arr[j])
-				swap(&arr[i], &arr[j]);
+			if (arr[i] > arr[j])		// 현재 값이 비교 대상보다 크면
+				swap(&arr[i], &arr[j]); // 두 값을 교환
 		}
 	}
-	return arr[S / 2];
+	return arr[size / 2]; // 정렬된 배열의 중앙값 반환
 }
 
-BYTE MaxPooling(BYTE *arr, int size)
-{
-	// 오름차순 정렬
-	const int S = size;
-	for (int i = 0; i < size - 1; i++) // pivot index
-	{
-		for (int j = i + 1; j < size; j++) // 비교대상 index
-		{
-			if (arr[i] > arr[j])
-				swap(&arr[i], &arr[j]);
-		}
-	}
-	return arr[S - 1];
-}
-
-BYTE MinPooling(BYTE *arr, int size)
-{
-	// 오름차순 정렬
-	const int S = size;
-	for (int i = 0; i < size - 1; i++) // pivot index
-	{
-		for (int j = i + 1; j < size; j++) // 비교대상 index
-		{
-			if (arr[i] > arr[j])
-				swap(&arr[i], &arr[j]);
-		}
-	}
-	return arr[0];
-}
-
+// 메인 함수
 int main()
 {
-	BITMAPFILEHEADER hf;	// 14바이트
-	BITMAPINFOHEADER hInfo; // 40바이트
-	RGBQUAD hRGB[256];		// 1024바이트
+	BITMAPFILEHEADER hf;	// BMP 파일 헤더 (14바이트)
+	BITMAPINFOHEADER hInfo; // BMP 정보 헤더 (40바이트)
+	RGBQUAD hRGB[256];		// 색상 팔레트 (256개 색상, 1024바이트)
 	FILE *fp;
+
+	// 입력 BMP 파일 열기
 	fp = fopen("lenna_gauss.bmp", "rb");
-	if (fp == NULL)
+	if (fp == NULL) // 파일이 없으면
 	{
-		printf("File not found!\n");
-		return -1;
+		printf("File not found!\n"); // 오류 메시지 출력
+		return -1;					 // 프로그램 종료
 	}
+
+	// BMP 파일 헤더 읽기
 	fread(&hf, sizeof(BITMAPFILEHEADER), 1, fp);
 	fread(&hInfo, sizeof(BITMAPINFOHEADER), 1, fp);
 	fread(hRGB, sizeof(RGBQUAD), 256, fp);
+
+	// 이미지 크기 계산
 	int ImgSize = hInfo.biWidth * hInfo.biHeight;
-	BYTE *Image = (BYTE *)malloc(ImgSize);
-	BYTE *Temp = (BYTE *)malloc(ImgSize); // 임시배열
-	BYTE *Output = (BYTE *)malloc(ImgSize);
+
+	// 동적 메모리 할당
+	BYTE *Image = (BYTE *)malloc(ImgSize);	// 원본 이미지
+	BYTE *Temp = (BYTE *)malloc(ImgSize);	// 임시 배열
+	BYTE *Output = (BYTE *)malloc(ImgSize); // 출력 이미지
+
+	// BMP 이미지 데이터 읽기
 	fread(Image, sizeof(BYTE), ImgSize, fp);
-	fclose(fp);
+	fclose(fp); // 파일 닫기
 
-	int Histo[256] = {0};
-	int AHisto[256] = {0};
+	// 미디언 필터링 수행
+	int Length = 3;				 // 필터 크기 (3x3)
+	int Margin = Length / 2;	 // 필터의 중심에서 가장자리까지 거리
+	int WSize = Length * Length; // 필터 내 픽셀 개수 (3x3 = 9)
 
-	/*ObtainHistogram(Image, Histo, hInfo.biWidth, hInfo.biHeight);
-	ObtainAHistogram(Histo, AHisto);
-	HistogramEqualization(Image, Output, AHisto, hInfo.biWidth, hInfo.biHeight);*/
-	/*int Thres = GozalezBinThresh();
-	Binarization(Image, Output, hInfo.biWidth, hInfo.biHeight, Thres);*/
+	BYTE *temp = (BYTE *)malloc(sizeof(BYTE) * WSize); // 필터 내 픽셀 값을 저장할 배열
 
-	// GaussAvrConv(Image, Output, hInfo.biWidth, hInfo.biHeight);
+	int W = hInfo.biWidth, H = hInfo.biHeight; // 이미지의 너비와 높이
 
-	/*Sobel_X_Conv(Image, Temp, hInfo.biWidth, hInfo.biHeight);
-	Sobel_Y_Conv(Image, Output, hInfo.biWidth, hInfo.biHeight);
-	for (int i = 0; i < ImgSize; i++) {
-		if (Temp[i] > Output[i]) 	Output[i] = Temp[i];
-	}
-	Binarization(Output, Output, hInfo.biWidth, hInfo.biHeight, 40);*/
-	/*GaussAvrConv(Image, Temp, hInfo.biWidth, hInfo.biHeight);
-	Laplace_Conv_DC(Temp, Output, hInfo.biWidth, hInfo.biHeight);*/
-
-	// HistogramStretching(Image, Output, Histo, hInfo.biWidth, hInfo.biHeight);
-	// InverseImage(Image, Output, hInfo.biWidth, hInfo.biHeight);
-	// BrightnessAdj(Image, Output, hInfo.biWidth, hInfo.biHeight, 70);
-	// ContrastAdj(Image, Output, hInfo.biWidth, hInfo.biHeight, 0.5);
-
-	/* Median filtering */
-
-	int Length = 9;			 // 마스크(필터)의 한 변의 길이. 여기서는 3x3 마스크를 사용.
-	int Margin = Length / 2; // 필터의 중심에서의 거리. 예: 3x3이면 Margin = 1
-
-	int WSize = Length * Length; // 필터 내 전체 픽셀 수 (예: 3x3 = 9개)
-
-	// 마스크 안의 픽셀 값을 담을 임시 배열 (정렬 후 중앙값 구하기 위함)
-	BYTE *temp = (BYTE *)malloc(sizeof(BYTE) * WSize);
-
-	int W = hInfo.biWidth, H = hInfo.biHeight; // 이미지의 너비(W), 높이(H)
-
-	int i, j, m, n; // 반복문에서 사용할 변수 선언
-
-	// 이미지 내부 픽셀들에 대해 필터 적용 (테두리는 제외해야 함)
-	for (i = Margin; i < H - Margin; i++)
-	{ // 행 방향으로 스캔
-		for (j = Margin; j < W - Margin; j++)
-		{ // 열 방향으로 스캔
-
-			// 마스크 내의 모든 픽셀 값을 temp 배열에 저장
-			for (m = -Margin; m <= Margin; m++)
-			{ // 마스크의 행 탐색
-				for (n = -Margin; n <= Margin; n++)
-				{ // 마스크의 열 탐색
+	// 이미지 내부 픽셀에 대해 필터 적용
+	for (int i = Margin; i < H - Margin; i++) // 행 방향으로 스캔
+	{
+		for (int j = Margin; j < W - Margin; j++) // 열 방향으로 스캔
+		{
+			// 필터 내의 모든 픽셀 값을 temp 배열에 저장
+			for (int m = -Margin; m <= Margin; m++) // 필터의 행 탐색
+			{
+				for (int n = -Margin; n <= Margin; n++) // 필터의 열 탐색
+				{
 					temp[(m + Margin) * Length + (n + Margin)] = Image[(i + m) * W + (j + n)];
-					// 마스크 내의 픽셀을 temp 배열에 1차원으로 저장
 				}
 			}
 
@@ -459,16 +170,20 @@ int main()
 		}
 	}
 
-	free(temp); // 동적 할당 해제
+	free(temp); // 동적 메모리 해제
 
-	/* Median filtering */
+	// 결과 BMP 파일 저장
+	FILE *out_fp = fopen("median_filtered.bmp", "wb");
+	fwrite(&hf, sizeof(BYTE), sizeof(BITMAPFILEHEADER), out_fp);
+	fwrite(&hInfo, sizeof(BYTE), sizeof(BITMAPINFOHEADER), out_fp);
+	fwrite(hRGB, sizeof(RGBQUAD), 256, out_fp);
+	fwrite(Output, sizeof(BYTE), ImgSize, out_fp);
+	fclose(out_fp);
 
-	AverageConv(Image, Output, hInfo.biWidth, hInfo.biHeight);
-
-	SaveBMPFile(hf, hInfo, hRGB, Output, hInfo.biWidth, hInfo.biHeight, "median_9.bmp");
-
+	// 동적 메모리 해제
 	free(Image);
 	free(Output);
 	free(Temp);
-	return 0;
+
+	return 0; // 프로그램 종료
 }
